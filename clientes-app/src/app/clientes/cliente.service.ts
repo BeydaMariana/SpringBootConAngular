@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Cliente } from './cliente';
+import { Region } from './region';
 import { Observable, of } from 'rxjs';
 import { HttpClient, HttpHeaders, HttpRequest, HttpEvent } from '@angular/common/http';
 import { map, catchError, tap } from 'rxjs/operators';
@@ -19,6 +20,10 @@ export class ClienteService {
 
   constructor(private http: HttpClient,  
     private router: Router) { }
+
+    getRegiones(): Observable<Region[]>{
+      return this.http.get<Region[]>(this.urlEndPoint+'/regiones');
+    }
 
   /* getClientes(): Observable<Cliente[]>{
     //return of(CLIENTES);
@@ -52,7 +57,7 @@ export class ClienteService {
     return this.http.get(this.urlEndPoint+'/page/'+ page).pipe(
       tap((response: any) => {
         (response.content as Cliente[]).forEach(cliente => {
-          console.log(cliente.nombre);
+          //console.log(cliente.region);
         });
       }),
       map((response: any) => {
@@ -64,7 +69,7 @@ export class ClienteService {
       }),
       tap(response => { //Este es el tap que consulta valores pero sin generar un return
         (response.content as Cliente[]).forEach(cliente => {
-          console.log(cliente.nombre);
+          //console.log(cliente.nombre);
         });
       })
       );
