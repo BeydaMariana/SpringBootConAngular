@@ -8,6 +8,7 @@ import { throwError } from 'rxjs';
 import swal from "sweetalert2";
 import { Router } from '@angular/router';
 import { formatDate, DatePipe } from '@angular/common';
+import { AuthService } from '../usuarios/auth.service';
 
 @Injectable({
   providedIn: 'root'
@@ -16,13 +17,44 @@ export class ClienteService {
 
   private urlEndPoint: string = 'http://localhost:8080/api/clientes';
 
-  private httpHeaders = new HttpHeaders({'Content-Type': 'application/json'})
-
   constructor(private http: HttpClient,  
-    private router: Router) { }
+    private router: Router,
+    private authService: AuthService) { }
+
+    /* private agregarAuthorizationHeader(){
+      let token = this.authService.token;
+      if(token != null){
+        return this.httpHeaders.append('Authorization', 'Bearer' + token);
+      }
+      return this.httpHeaders;
+    } */
+
+    private isNoAutorizado(e): boolean{
+      if(e.status==401){
+        
+        if(this.authService.isAuthenticated()){
+          this.authService.logout();
+        }
+
+        this.router.navigate(['/login']);
+        return true;
+      }
+
+      if(e.status==403){
+        swal.fire('Acceso denegado', `Hola ${this.authService.usuario.username} no tienes acceso a este recurso!`, 'warning')
+        this.router.navigate(['/clientes']);
+        return true;
+      }
+      return false;
+    }
 
     getRegiones(): Observable<Region[]>{
-      return this.http.get<Region[]>(this.urlEndPoint+'/regiones');
+      return this.http.get<Region[]>(this.urlEndPoint+'/regiones').pipe(
+        catchError(e => {
+          this.isNoAutorizado(e);
+          return throwError(e);
+        })
+      );
     }
 
   /* getClientes(): Observable<Cliente[]>{
@@ -76,9 +108,13 @@ export class ClienteService {
   }
 
   create(cliente: Cliente) : Observable<any>{
-    return this.http.post<any>(this.urlEndPoint, cliente, {headers: this.httpHeaders}).pipe(
+    return this.http.post<any>(this.urlEndPoint, cliente).pipe(
       map( (response: any) => response.cliente as Cliente), //Esta es la opción 1 para enviar el cliente y el mensaje del backend
       catchError(e => {
+
+        if(this.isNoAutorizado(e)){
+          return throwError(e);
+        }
 
         if(e.status==400){
           return throwError(e);
@@ -93,6 +129,11 @@ export class ClienteService {
   getCliente(id): Observable<Cliente>{
     return this.http.get<Cliente>(`${this.urlEndPoint}/${id}`).pipe(
       catchError(e => {
+
+        if(this.isNoAutorizado(e)){
+          return throwError(e);
+        }
+
         this.router.navigate(['/clientes']);
         swal.fire('Error al editar', e.error.mensaje, 'error');   //Manda el error establecido en el backend     
         return throwError(e); //El throwError es para retornar el observable
@@ -101,8 +142,12 @@ export class ClienteService {
   }
 
   update(cliente: Cliente): Observable<any>{ //se pone any para que reconozca el json mandado desde el backend, opción 2
-    return this.http.put<any>(`${this.urlEndPoint}/${cliente.id}`, cliente, {headers: this.httpHeaders}).pipe(
+    return this.http.put<any>(`${this.urlEndPoint}/${cliente.id}`, cliente).pipe(
       catchError(e => {
+
+        if(this.isNoAutorizado(e)){
+          return throwError(e);
+        }
 
         if(e.status==400){
           return throwError(e);//Recibe el error de validación del backend
@@ -115,8 +160,13 @@ export class ClienteService {
   }
 
   delete(id:number): Observable<Cliente>{
-    return this.http.delete<Cliente>(`${this.urlEndPoint}/${id}`, {headers: this.httpHeaders}).pipe(
+    return this.http.delete<Cliente>(`${this.urlEndPoint}/${id}`).pipe(
       catchError(e => {
+
+        if(this.isNoAutorizado(e)){
+          return throwError(e);
+        }
+
         swal.fire(e.error.mensaje, e.error.error, 'error');
         return throwError(e); 
       })
@@ -129,11 +179,17 @@ export class ClienteService {
     formData.append("archivo", archivo);
     formData.append("id", id);
 
+
     const req = new HttpRequest('POST', `${this.urlEndPoint}/upload`, formData, {
       reportProgress: true
     });
 
-    return this.http.request(req);
+    return this.http.request(req).pipe(
+        catchError(e => {
+          this.isNoAutorizado(e);
+          return throwError(e);
+        })
+      );
   }
 
 }
